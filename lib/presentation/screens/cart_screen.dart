@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/cart_checkout_service.dart';
+import '../../core/services/order_service.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -9,127 +9,90 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final CartCheckoutService _checkoutService = CartCheckoutService();
-  bool _isLoading = false;
+  final OrderService _orderService = OrderService();
+  bool _isSubmitting = false;
 
-  // قيم افتراضية للتجربة (يمكن ربطها بموقع المستخدم والمتاجر الحقيقية)
-  final double userLat = 32.8872; // طرابلس
-  final double userLng = 13.1913;
-  
-  // موقع متجر افتراضي قريب (أقل من 20 كم)
-  final double storeLat = 32.8900;
-  final double storeLng = 13.1800;
+  // مسافة التوصيل (مثال تجريبي)
+  double distanceInKm = 25.0; // تجريبياً 25 كم لاختبار التوجيه الهاتفي
 
-  void _handleCheckout() async {
-    setState(() => _isLoading = true);
-
-    // 1️⃣ التحقق من شرط المسافة (20 كم)
-    bool isWithinRange = await _checkoutService.isWithinAllowedDistance(
-      userLat: userLat,
-      userLng: userLng,
-      storeLat: storeLat,
-      storeLng: storeLng,
-    );
-
-    setState(() => _isLoading = false);
-
-    if (!isWithinRange) {
-      _showErrorDialog('عذراً، لا يمكن إتمام الطلب لأن المسافة بينك وبين المتجر تتجاوز 20 كم.');
+  void _checkout() async {
+    // 1. فحص المسافة: إذا تجاوزت 20 كم يُمنع الحفظ سحابياً وتظهر رسالة الطلب الهاتفي
+    if (distanceInKm > 20.0) {
+      _showPhoneOrderDialog();
       return;
     }
 
-    // 2️⃣ طلب إدخال رمز التحقق OTP
-    _showOtpDialog();
-  }
+    // 2. إذا كانت المسافة ضمن 20 كم يتم الحفظ في Firestore
+    setState(() => _isSubmitting = true);
 
-  void _showOtpDialog() {
-    final TextEditingController otpController = TextEditingController();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الطلب', textAlign: TextAlign.center),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('تم إرسال رمز التحقق (OTP) إلى هاتفك:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: otpController,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 24, letterSpacing: 8),
-              decoration: const InputDecoration(
-                hintText: '0000',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-            onPressed: () {
-              if (otpController.text.length == 4) {
-                Navigator.pop(context);
-                _showSuccessDialog();
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('يرجى إدخال رمز مكون من 4 أرقام')),
-                );
-              }
-            },
-            child: const Text('تأكيد'),
-          ),
-        ],
-      ),
+    bool success = await _orderService.createOrder(
+      userId: 'user_123',
+      userName: 'عميل تجريبي',
+      items: [
+        {'name': 'منتج 1', 'price': 50, 'quantity': 1},
+        {'name': 'منتج 2', 'price': 30, 'quantity': 2},
+      ],
+      totalPrice: 110.0,
+      distanceKm: distanceInKm,
+      deliveryAddress: 'عنوان التوصيل المحدد',
     );
+
+    setState(() => _isSubmitting = false);
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال الطلب وحفظه في الفايربيس بنجاح! 🎉'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حدث خطأ أثناء حفظ الطلب.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  void _showErrorDialog(String message) {
+  void _showPhoneOrderDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            Icon(Icons.phone_in_talk, color: Colors.orange),
             SizedBox(width: 8),
-            Text('تنبيه المسافة'),
+            Text('خارج نطاق التوصيل المباشر', style: TextStyle(fontSize: 16)),
           ],
         ),
-        content: Text(message),
+        content: Text(
+          'مسافة التوصيل الحالية ($distanceInKm كم) تتجاوز الحد المسموح به للطلب التلقائي (20 كم).\n\nيمكنك إتمام الطلب مباشرة عن طريق الاتصال الهاتفي بخدمة العملاء لتنسيق التوصيل الخاص.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('حسناً'),
+            child: const Text('إلغاء', style: TextStyle(color: Colors.grey)),
           ),
-        ],
-      ),
-    );
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Icon(Icons.check_circle, color: Colors.green, size: 50),
-        content: const Text(
-          'تم تأكيد طلبك بنجاح! سيصلك إشعار بالبضائع والشحن.',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          ElevatedButton(
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () {
               Navigator.pop(context);
-              Navigator.pop(context); // العودة للرئيسية
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('جاري الاتصال بخدمة العملاء... 📞'),
+                  backgroundColor: Colors.blue,
+                ),
+              );
             },
-            child: const Text('العودة للرئيسية'),
+            icon: const Icon(Icons.phone),
+            label: const Text('اتصال الآن'),
           ),
         ],
       ),
@@ -143,34 +106,30 @@ class _CartScreenState extends State<CartScreen> {
         title: const Text('سلة التسوق'),
         backgroundColor: Colors.blue.shade800,
         foregroundColor: Colors.white,
+        centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Expanded(
-              child: ListView(
-                children: const [
-                  Card(
-                    child: ListTile(
-                      leading: Icon(Icons.shopping_bag, color: Colors.blue),
-                      title: Text('منتج تجريبي 1'),
-                      subtitle: Text('الكمية: 2'),
-                      trailing: Text('50 د.ل', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
+            Card(
+              elevation: 2,
+              child: ListTile(
+                leading: const Icon(Icons.location_on, color: Colors.blue),
+                title: const Text('مسافة التوصيل المحسوبة'),
+                subtitle: Text('$distanceInKm كم من موقعك'),
+                trailing: TextButton(
+                  onPressed: () {
+                    // التبديل بين الأرقام لاختبار الحالتين (أكبر وأقل من 20 كم)
+                    setState(() {
+                      distanceInKm = distanceInKm > 20.0 ? 15.0 : 25.0;
+                    });
+                  },
+                  child: const Text('تغيير المسافة للتجربة'),
+                ),
               ),
             ),
-            const Divider(),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('الإجمالي:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('50 د.ل', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
-              ],
-            ),
-            const SizedBox(height: 16),
+            const Spacer(),
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -179,10 +138,13 @@ class _CartScreenState extends State<CartScreen> {
                   backgroundColor: Colors.blue.shade800,
                   foregroundColor: Colors.white,
                 ),
-                onPressed: _isLoading ? null : _handleCheckout,
-                child: _isLoading
+                onPressed: _isSubmitting ? null : _checkout,
+                child: _isSubmitting
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('إتمام الطلب والتأكيد', style: TextStyle(fontSize: 16)),
+                    : const Text(
+                        'تأكيد وإتمام الطلب',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],
