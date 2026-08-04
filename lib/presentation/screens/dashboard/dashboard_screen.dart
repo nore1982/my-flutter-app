@@ -1,81 +1,108 @@
 import 'package:flutter/material.dart';
 
-class DashboardScreen extends StatelessWidget {
-  final String userType;
+// الرجوع خطوة للخلف للوصول لشاشات مجلد screens
+import '../analytics_screen.dart';
+import '../cart_screen.dart';
+import '../company_registration_screen.dart';
+import '../customers_screen.dart';
 
-  const DashboardScreen({
-    super.key,
-    this.userType = 'company', // قيمة افتراضية تجنباً لأي خطأ
-  });
+class DashboardScreen extends StatelessWidget {
+  final String? userType;
+
+  const DashboardScreen({super.key, this.userType});
 
   @override
   Widget build(BuildContext context) {
-    final bool isCompany = userType == 'company';
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(isCompany ? 'لوحة تحكم المتجر' : 'لوحة تحكم الحرفي'),
-        backgroundColor: isCompany ? Colors.blue.shade800 : Colors.teal.shade800,
+        title: Text(userType == 'company' ? 'لوحة تحكم الشركة' : 'لوحة التحكم الرئيسية'),
+        backgroundColor: Colors.blue.shade800,
         foregroundColor: Colors.white,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
+        child: GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
           children: [
-            Card(
-              elevation: 2,
-              color: isCompany ? Colors.blue.shade50 : Colors.teal.shade50,
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isCompany ? Colors.blue : Colors.teal,
-                  child: Icon(
-                    isCompany ? Icons.store : Icons.person,
-                    color: Colors.white,
-                  ),
-                ),
-                title: Text(
-                  isCompany ? 'حساب متجر مفعّل' : 'حساب حرفي مفعّل',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: const Text('الحالة: نشط وموثق'),
+            _buildDashboardItem(
+              context,
+              title: 'السلة والطلبات',
+              icon: Icons.shopping_cart,
+              color: Colors.orange,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.shopping_bag, color: Colors.orange, size: 30),
-                          const SizedBox(height: 8),
-                          const Text('12', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                          Text(isCompany ? 'الطلبات' : 'الخدمات', style: const TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  ),
+            _buildDashboardItem(
+              context,
+              title: 'الإحصائيات',
+              icon: Icons.analytics,
+              color: Colors.green,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AnalyticsScreen()),
+              ),
+            ),
+            _buildDashboardItem(
+              context,
+              title: 'العملاء',
+              icon: Icons.people,
+              color: Colors.purple,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CustomersScreen()),
+              ),
+            ),
+            _buildDashboardItem(
+              context,
+              title: 'تسجيل شركة/فرع',
+              icon: Icons.business,
+              color: Colors.teal,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CompanyRegistrationScreen(),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 30),
-                          const SizedBox(height: 8),
-                          const Text('4.8', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                          const Text('التقييم', style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardItem(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: color.withOpacity(0.15),
+              child: Icon(icon, size: 32, color: color),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
